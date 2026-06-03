@@ -18,15 +18,10 @@ _WIKI_CLONE = Path("/tmp/ai-cube-wiki")
 MODEL = "claude-opus-4-8"
 
 # ─── Wiki data ────────────────────────────────────────────────────────────────
-@st.cache_resource(show_spinner="Loading wiki data from GitHub...")
+@st.cache_resource(show_spinner="Cloning wiki from GitHub...")
 def fetch_wiki_dir() -> Path:
-    """Clone or pull the data repo; return path to its wiki/ folder."""
-    if _WIKI_CLONE.exists():
-        subprocess.run(
-            ["git", "-C", str(_WIKI_CLONE), "pull", "--ff-only"],
-            capture_output=True, timeout=30,
-        )
-    else:
+    """Clone the data repo once; return path to its wiki/ folder."""
+    if not _WIKI_CLONE.exists():
         subprocess.run(
             ["git", "clone", "--depth=1", DATA_REPO_URL, str(_WIKI_CLONE)],
             check=True, capture_output=True, timeout=60,
@@ -36,7 +31,13 @@ def fetch_wiki_dir() -> Path:
     return wiki
 
 
+@st.cache_data(ttl=300, show_spinner="Syncing wiki from GitHub...")
 def load_wiki_context() -> str:
+    """Pull latest commits and re-read all wiki files every 5 minutes."""
+    subprocess.run(
+        ["git", "-C", str(_WIKI_CLONE), "pull", "--ff-only"],
+        capture_output=True, timeout=30,
+    )
     wiki_dir = fetch_wiki_dir()
     parts = []
     for md_file in sorted(wiki_dir.rglob("*.md")):
@@ -123,12 +124,16 @@ def main():
     synthesis_count = len(list((_wd / "synthesis").glob("*.md"))) if (_wd / "synthesis").exists() else 0
     sector_count    = len(list((_wd / "sectors").glob("*.md")))   if (_wd / "sectors").exists()   else 0
 
-    hdr_left, hdr_right = st.columns([5, 1])
+    hdr_left, hdr_mid, hdr_right = st.columns([5, 1, 1])
     with hdr_left:
         st.caption(
             f"Wiki · {pathway_count} pathways · {entity_count} entities · "
             f"{synthesis_count} synthesis · {sector_count} sectors"
         )
+    with hdr_mid:
+        if st.button("Refresh Wiki", use_container_width=True):
+            load_wiki_context.clear()
+            st.rerun()
     with hdr_right:
         if st.session_state.get("chat_history"):
             if st.button("Clear", use_container_width=True):
