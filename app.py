@@ -147,8 +147,7 @@ def main():
     if not st.session_state.chat_history:
         st.markdown(
             "<div style='text-align:center; color:#888; padding: 3rem 0;'>"
-            "Ask what is documented in the wiki — what pathways say, what is missing, "
-            "which pages cover a topic."
+            "An assistant for people contributing to and capturing AI deployment pathways — helps check completeness, surface what others have done, identify gaps, and articulate reusable artifacts."
             "</div>",
             unsafe_allow_html=True,
         )
