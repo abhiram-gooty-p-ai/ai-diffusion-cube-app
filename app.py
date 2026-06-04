@@ -3,8 +3,13 @@ import streamlit.components.v1 as components
 import anthropic
 import os
 import subprocess
+import base64
+import threading
+import time
+import uuid
 from pathlib import Path
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
 
@@ -45,6 +50,51 @@ def load_wiki_context() -> str:
         content = md_file.read_text(encoding="utf-8")
         parts.append(f"### File: {rel}\n\n{content}")
     return "\n\n---\n\n".join(parts)
+
+# ─── Conversation logging ─────────────────────────────────────────────────────
+def _push_log(session_id: str, history: list[dict], token: str, repo: str) -> None:
+    date = time.strftime("%Y-%m-%d")
+    filename = f"logs/{date}_{session_id[:8]}.md"
+    url = f"https://api.github.com/repos/{repo}/contents/{filename}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    lines = [f"# Conversation Log\n\n**Session:** `{session_id}`  \n**Date:** {date}\n\n---\n\n"]
+    for msg in history:
+        role = "User" if msg["role"] == "user" else "Assistant"
+        lines.append(f"### {role}\n\n{msg['content']}\n\n---\n\n")
+    encoded = base64.b64encode("".join(lines).encode("utf-8")).decode()
+
+    sha = None
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            sha = r.json().get("sha")
+    except Exception:
+        pass
+
+    payload = {"message": f"log: session {session_id[:8]}", "content": encoded}
+    if sha:
+        payload["sha"] = sha
+    try:
+        requests.put(url, json=payload, headers=headers, timeout=15)
+    except Exception:
+        pass
+
+
+def save_conversation(session_id: str, history: list[dict]) -> None:
+    token = st.secrets.get("GITHUB_TOKEN", "") or os.environ.get("GITHUB_TOKEN", "")
+    repo = st.secrets.get("LOGS_REPO", "") or os.environ.get("LOGS_REPO", "")
+    if not token or not repo:
+        return
+    threading.Thread(
+        target=_push_log,
+        args=(session_id, history, token, repo),
+        daemon=True,
+    ).start()
+
 
 # ─── Chatbot ──────────────────────────────────────────────────────────────────
 CHATBOT_SYSTEM = """You are an assistant for the AI Diffusion Cube — a knowledge tool built on real AI deployment experience, organised through the six dimensions framework. You help pathway contributors and the people who engage them.
@@ -140,6 +190,10 @@ def main():
 
     st.divider()
 
+    # ── Session ID for logging ────────────────────────────────────────────────
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+
     # ── Chat history ──────────────────────────────────────────────────────────
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
@@ -181,6 +235,10 @@ def main():
                 )
                 st.session_state.chat_history.append(
                     {"role": "assistant", "content": answer}
+                )
+                save_conversation(
+                    st.session_state.session_id,
+                    st.session_state.chat_history,
                 )
             except Exception as e:
                 st.error(f"Error: {e}")
