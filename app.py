@@ -155,10 +155,10 @@ def main():
 
     hdr_left, hdr_mid, hdr_right = st.columns([5, 1, 1])
     with hdr_left:
-        st.caption(
-            f"Wiki · {pathway_count} pathways · {entity_count} entities · "
-            f"{synthesis_count} synthesis · {sector_count} sectors"
-        )
+    #    st.caption(
+    #        f"Wiki · {pathway_count} pathways · {entity_count} entities · "
+    #        f"{synthesis_count} synthesis · {sector_count} sectors"
+    #    )
     with hdr_mid:
         if st.button("Refresh Wiki", use_container_width=True):
             load_wiki_context.clear()
