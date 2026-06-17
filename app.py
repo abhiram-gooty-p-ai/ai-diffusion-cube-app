@@ -182,7 +182,7 @@ def main():
     if not st.session_state.chat_history:
         st.markdown(
             "<div style='text-align:center; color:#888; padding: 3rem 0;'>"
-            "An assistant for people contributing to and capturing AI deployment pathways — helps check completeness, surface what others have done, identify gaps, and articulate reusable artifacts."
+            "An assistant that makes lived experience from real AI deployments accessible and reusable for the next person attempting something similar."
             "</div>",
             unsafe_allow_html=True,
         )
